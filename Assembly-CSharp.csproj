@@ -59,10 +59,18 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\DarkRift\DarkRift\Plugins\Server\UnityServerHelper.cs" />
+    <Compile Include="Assets\Scripts\PlayerControls\RiftPlayerController.cs" />
     <Compile Include="Assets\DarkRift\DarkRift\Plugins\Server\XmlUnityServer.cs" />
     <Compile Include="Assets\DarkRift\DarkRift\Plugins\Server\UnityConsoleWriter.cs" />
+    <Compile Include="Assets\Scripts\Network\RiftView.cs" />
+    <Compile Include="Assets\Scripts\Network\RiftManager.cs" />
+    <Compile Include="Assets\Scripts\Network\RiftTags.cs" />
+    <Compile Include="Assets\Scripts\PlayerControls\RiftSyncVar.cs" />
     <Compile Include="Assets\DarkRift\DarkRift\Plugins\Client\UnityClient.cs" />
     <Compile Include="Assets\DarkRift\DarkRift\Plugins\Server\UnityServer.cs" />
+    <Compile Include="Assets\Scripts\PlayerControls\MouseLook.cs" />
+    <Compile Include="Assets\Scripts\PlayerControls\FirstPersonController.cs" />
+    <Compile Include="Assets\Scripts\Network\RiftBehaviour.cs" />
     <Compile Include="Assets\DarkRift\DarkRift\Plugins\Client\SerializableObjectCacheSettings.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -733,14 +741,14 @@
     <Reference Include="Unity.PlasticSCM.Editor">
       <HintPath>Library\ScriptAssemblies\Unity.PlasticSCM.Editor.dll</HintPath>
     </Reference>
-    <Reference Include="Unity.VisualScripting.State.Editor">
-      <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.State.Editor.dll</HintPath>
+    <Reference Include="Unity.VisualScripting.Shared.Editor">
+      <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.Shared.Editor.dll</HintPath>
     </Reference>
     <Reference Include="Unity.Timeline.Editor">
       <HintPath>Library\ScriptAssemblies\Unity.Timeline.Editor.dll</HintPath>
     </Reference>
-    <Reference Include="Unity.VisualScripting.Shared.Editor">
-      <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.Shared.Editor.dll</HintPath>
+    <Reference Include="Unity.VisualScripting.State.Editor">
+      <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.State.Editor.dll</HintPath>
     </Reference>
     <Reference Include="Unity.VisualStudio.Editor">
       <HintPath>Library\ScriptAssemblies\Unity.VisualStudio.Editor.dll</HintPath>
