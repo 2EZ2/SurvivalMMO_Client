@@ -21,13 +21,11 @@ public class RiftPlayerController : RiftBehaviour
     /// <summary>
     ///     The position to lerp to.
     /// </summary>
-    [RiftSyncVar]
     public Vector3 NewPosition { get; set; }
 
     /// <summary>
     ///     The rotation to lerp to.
-    /// </summary>
-    [RiftSyncVar]
+    /// </summary>    
     public Vector3 NewRotation { get; set; }
 
 
@@ -42,6 +40,9 @@ public class RiftPlayerController : RiftBehaviour
     Vector3 lastRotation;
     public CharacterController m_CharacterController;
     private Vector3 m_MoveDir = Vector3.zero;
+
+    [RiftSyncVar]
+    public int Health = 100;
 
     // Start is called before the first frame update
     void Start()
@@ -66,7 +67,7 @@ public class RiftPlayerController : RiftBehaviour
             if (Vector3.SqrMagnitude(transform.position - lastPosition) > 0.1f ||
                 Vector3.SqrMagnitude(transform.eulerAngles - lastRotation) > 5f) 
             { 
-                SendStreamSerializeEvent(); 
+                //SendStreamSerializeEvent(); 
             }           
         }
         else
@@ -124,10 +125,18 @@ public class RiftPlayerController : RiftBehaviour
         Debug.Log($@"Remote Gun Shot did {damage} because {reason}");
     }
 
-    public override void OnStreamSerializeEvent(RiftStream stream)
+    public override RiftStream OnStreamSerializeEvent(RiftStream stream)
     {
-        stream.SendNext(new vec3(transform.position));
-        stream.SendNext(new vec3(transform.rotation.eulerAngles));
+        if (stream.IsWriting)
+        {
+            stream.SendNext(new vec3(transform.position));
+            stream.SendNext(new vec3(transform.rotation.eulerAngles));
+
+            lastPosition = transform.position;
+            lastRotation = transform.rotation.eulerAngles;
+        }
+        
+        return stream;
     }
 
     public override void OnStreamDeserializeEvent(RiftStream stream)

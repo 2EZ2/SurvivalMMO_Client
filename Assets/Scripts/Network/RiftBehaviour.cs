@@ -21,10 +21,12 @@ public class RiftBehaviour : MonoBehaviour
 
     public bool IsMine { get => client.ID == _RiftView.Owner; }
 
-    public virtual void OnStreamSerializeEvent(RiftStream Stream)
-    {
 
+    public virtual RiftStream OnStreamSerializeEvent(RiftStream Stream)
+    {
+        return Stream;
     }
+
     public virtual void OnStreamDeserializeEvent(RiftStream Stream)
     {
 
@@ -43,6 +45,17 @@ public class RiftBehaviour : MonoBehaviour
             {
                 Debug.Log($@"parameter count:{info.GetParameters().Length}, buffer length: {view.parameterValues.ToArray().Length}");
                 info.Invoke(this, view.parameterValues.ToArray());
+            }
+        }
+    }
+
+    public void UpdateSyncVars()
+    {
+        foreach (PropertyInfo info  in this.GetType().GetRuntimeProperties())
+        {
+            if(info.GetCustomAttribute<RiftSyncVar>() != null)
+            {
+                info.SetValue(this, null);
             }
         }
     }

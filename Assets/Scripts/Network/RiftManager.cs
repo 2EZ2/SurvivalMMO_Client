@@ -49,8 +49,6 @@ public class RiftManager : MonoBehaviour
 
     public static Dictionary<string, List<Type>> Behaviour_SyncVars = new Dictionary<string, List<Type>>();
 
-
-
     public static void SendSync(RiftView view, RiftStream stream)
     {
         //Serialize
@@ -135,7 +133,49 @@ public class RiftManager : MonoBehaviour
         localPlayer.ID = client.ID;
         localPlayer.Owner = client.ID;
         Debug.Log(client.ID);
-               
+
+        GetAllSyncVars();
+        GetAllRPCs();
+
+
+        client.MessageReceived += Client_MessageReceived;
+
+        InvokeRepeating("ServerTick", 1.0f, 0.01f);
+
+        //DontDestroyOnLoad(gameObject);
+    }
+
+    void GetAllRPCs()
+    {
+        RPC_COMMANDS.Clear();
+        var types = Assembly.GetAssembly(typeof(RiftBehaviour)).GetTypes().Where(myType => myType.IsClass && !myType.IsAbstract && myType.IsSubclassOf(typeof(RiftBehaviour)));
+        foreach (var field in types)
+        {
+            foreach (MethodInfo info in field.GetMethods())
+            {
+                if (info.GetCustomAttribute<RiftRPC>() != null)
+                {
+                    Debug.Log($@"Found RPC: {info.Name} in {field.Name}");
+
+                    if (!RPC_COMMANDS.ContainsKey(info.Name))
+                    {
+                        List<Type> ptypes = new List<Type>();
+
+                        foreach (var item in info.GetParameters())
+                        {
+                            Debug.Log($@"RPC:{info.Name} has parameter {item.ParameterType}");
+                            ptypes.Add(item.ParameterType);
+                        }
+
+                        RPC_COMMANDS.Add(info.Name, ptypes.ToArray());
+                    }
+                }
+            }
+        }
+    }
+
+    void GetAllSyncVars()
+    {
         var types = Assembly.GetAssembly(typeof(RiftBehaviour)).GetTypes().Where(myType => myType.IsClass && !myType.IsAbstract && myType.IsSubclassOf(typeof(RiftBehaviour)));
         foreach (var field in types)
         {
@@ -163,39 +203,25 @@ public class RiftManager : MonoBehaviour
                     }
                 }
             }
-
-            foreach (MethodInfo info in field.GetMethods())
-            {
-                if(info.GetCustomAttribute<RiftRPC>() != null)
-                {
-                    Debug.Log($@"Found RPC: {info.Name} in {field.Name}");
-
-                    if (!RPC_COMMANDS.ContainsKey(info.Name))
-                    {
-                        List<Type> ptypes = new List<Type>();
-
-                        foreach (var item in info.GetParameters())
-                        {
-                            Debug.Log($@"RPC:{info.Name} has parameter {item.ParameterType}");
-                            ptypes.Add(item.ParameterType);
-                        }
-
-                        RPC_COMMANDS.Add(info.Name, ptypes.ToArray());
-                    }
-                }
-            }
         }
-        
-        client.MessageReceived += Client_MessageReceived;
-
-        InvokeRepeating("ServerTick", 1.0f, 2.0f);
-
-        //DontDestroyOnLoad(gameObject);
-    }
+        }
 
     void ServerTick()
     {
+        RiftBehaviour[] behaviours = GameObject.FindObjectsByType<RiftBehaviour>(FindObjectsSortMode.InstanceID);
 
+        //Seralize event
+        foreach(var rb in behaviours)
+        {
+            if(rb._RiftView.Owner == client.ID)
+            {
+                RiftStream stream = new RiftStream(true, null);
+                SendSync(rb._RiftView, rb.OnStreamSerializeEvent(stream));
+            }           
+        }
+
+        //Send sync var loop
+            
     }
 
     /// <summary>
