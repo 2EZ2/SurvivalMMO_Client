@@ -58,6 +58,7 @@
     <Analyzer Include="C:\Program Files (x86)\2022.3.0f1\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\Scripts\Network\RiftStream.cs" />
     <Compile Include="Assets\DarkRift\DarkRift\Plugins\Server\UnityServerHelper.cs" />
     <Compile Include="Assets\Scripts\PlayerControls\RiftPlayerController.cs" />
     <Compile Include="Assets\DarkRift\DarkRift\Plugins\Server\XmlUnityServer.cs" />
@@ -68,8 +69,6 @@
     <Compile Include="Assets\Scripts\PlayerControls\RiftSyncVar.cs" />
     <Compile Include="Assets\DarkRift\DarkRift\Plugins\Client\UnityClient.cs" />
     <Compile Include="Assets\DarkRift\DarkRift\Plugins\Server\UnityServer.cs" />
-    <Compile Include="Assets\Scripts\PlayerControls\MouseLook.cs" />
-    <Compile Include="Assets\Scripts\PlayerControls\FirstPersonController.cs" />
     <Compile Include="Assets\Scripts\Network\RiftBehaviour.cs" />
     <Compile Include="Assets\DarkRift\DarkRift\Plugins\Client\SerializableObjectCacheSettings.cs" />
   </ItemGroup>
@@ -336,14 +335,14 @@
     <Reference Include="ReportGeneratorMerged">
       <HintPath>Library\PackageCache\com.unity.testtools.codecoverage@1.2.3\lib\ReportGenerator\ReportGeneratorMerged.dll</HintPath>
     </Reference>
-    <Reference Include="Unity.VisualScripting.Antlr3.Runtime">
-      <HintPath>Library\PackageCache\com.unity.visualscripting@1.8.0\Runtime\VisualScripting.Flow\Dependencies\NCalc\Unity.VisualScripting.Antlr3.Runtime.dll</HintPath>
-    </Reference>
     <Reference Include="DarkRift">
       <HintPath>Assets\DarkRift\DarkRift\Plugins\DarkRift.dll</HintPath>
     </Reference>
     <Reference Include="DarkRift.Client">
       <HintPath>Assets\DarkRift\DarkRift\Plugins\Client\DarkRift.Client.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.VisualScripting.Antlr3.Runtime">
+      <HintPath>Library\PackageCache\com.unity.visualscripting@1.8.0\Runtime\VisualScripting.Flow\Dependencies\NCalc\Unity.VisualScripting.Antlr3.Runtime.dll</HintPath>
     </Reference>
     <Reference Include="DarkRift.Server">
       <HintPath>Assets\DarkRift\DarkRift\Plugins\Server\DarkRift.Server.dll</HintPath>
@@ -741,14 +740,14 @@
     <Reference Include="Unity.PlasticSCM.Editor">
       <HintPath>Library\ScriptAssemblies\Unity.PlasticSCM.Editor.dll</HintPath>
     </Reference>
-    <Reference Include="Unity.VisualScripting.Shared.Editor">
-      <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.Shared.Editor.dll</HintPath>
+    <Reference Include="Unity.VisualScripting.State.Editor">
+      <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.State.Editor.dll</HintPath>
     </Reference>
     <Reference Include="Unity.Timeline.Editor">
       <HintPath>Library\ScriptAssemblies\Unity.Timeline.Editor.dll</HintPath>
     </Reference>
-    <Reference Include="Unity.VisualScripting.State.Editor">
-      <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.State.Editor.dll</HintPath>
+    <Reference Include="Unity.VisualScripting.Shared.Editor">
+      <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.Shared.Editor.dll</HintPath>
     </Reference>
     <Reference Include="Unity.VisualStudio.Editor">
       <HintPath>Library\ScriptAssemblies\Unity.VisualStudio.Editor.dll</HintPath>

@@ -25,10 +25,10 @@ public class RiftManager : MonoBehaviour
 
     public RiftView localPlayer = new RiftView(0, 0);
 
-    Dictionary<ushort, RiftView> players = new Dictionary<ushort, RiftView>();
-    Dictionary<ushort, RiftView> riftObjects = new Dictionary<ushort, RiftView>();
+    public static Dictionary<ushort, RiftView> players = new Dictionary<ushort, RiftView>();
     
-    Dictionary<RiftView, GameObject> riftGameObjects = new Dictionary<RiftView, GameObject>();
+
+    public static Dictionary<RiftView, GameObject> riftGameObjects = new Dictionary<RiftView, GameObject>();
     /// <summary>
     ///     The player object to spawn for our player.
     /// </summary>
@@ -67,7 +67,55 @@ public class RiftManager : MonoBehaviour
         }
     }
 
-private void Start()
+    public static void SendRPC(RiftView view, RPCTarget target, string method, params object[] inputs)
+    {        
+        //Serialize
+        using (DarkRiftWriter writer = DarkRiftWriter.Create())
+        {
+            writer.Write(view.ID);
+            writer.Write(view.Owner);
+            writer.Write(method);
+            object[] streamCache = inputs;
+            writer.WriteAs(typeof(object), streamCache);
+            
+            if(target == RPCTarget.Everyone)
+            {
+                writer.Write(false);
+            }
+            else
+            {
+                writer.Write(true);
+            }
+
+            Debug.Log($@"Running RPC {method}");
+            //Send
+            using (Message message = Message.Create(RiftTags.RPC, writer))
+                RiftManager.Instance.client.SendMessage(message, SendMode.Reliable);
+        }
+    }
+
+    public static void SendPrivateRPC(RiftView sender, RiftView target, string method, params object[] inputs)
+    {
+        //Serialize
+        using (DarkRiftWriter writer = DarkRiftWriter.Create())
+        {
+            writer.Write(sender.ID);
+            writer.Write(sender.Owner);
+            writer.Write(method);
+            object[] streamCache = inputs;
+            writer.WriteAs(typeof(object), streamCache);
+            writer.Write(true);
+            writer.Write(sender.ID);
+            writer.Write(sender.Owner);
+
+            Debug.Log($@"Running RPC {method}");
+            //Send
+            using (Message message = Message.Create(RiftTags.PrivateRPC, writer))
+                RiftManager.Instance.client.SendMessage(message, SendMode.Reliable);
+        }
+    }
+
+    private void Start()
     {
         if (Instance == null)
         {
@@ -87,12 +135,11 @@ private void Start()
         localPlayer.ID = client.ID;
         localPlayer.Owner = client.ID;
         Debug.Log(client.ID);
-        
-        
+               
         var types = Assembly.GetAssembly(typeof(RiftBehaviour)).GetTypes().Where(myType => myType.IsClass && !myType.IsAbstract && myType.IsSubclassOf(typeof(RiftBehaviour)));
         foreach (var field in types)
         {
-            foreach (PropertyInfo info in typeof(RiftBehaviour).GetProperties())
+            foreach (PropertyInfo info in field.GetProperties())
             {
                 if (info.GetCustomAttribute<RiftSyncVar>() != null)
                 {
@@ -116,13 +163,40 @@ private void Start()
                     }
                 }
             }
+
+            foreach (MethodInfo info in field.GetMethods())
+            {
+                if(info.GetCustomAttribute<RiftRPC>() != null)
+                {
+                    Debug.Log($@"Found RPC: {info.Name} in {field.Name}");
+
+                    if (!RPC_COMMANDS.ContainsKey(info.Name))
+                    {
+                        List<Type> ptypes = new List<Type>();
+
+                        foreach (var item in info.GetParameters())
+                        {
+                            Debug.Log($@"RPC:{info.Name} has parameter {item.ParameterType}");
+                            ptypes.Add(item.ParameterType);
+                        }
+
+                        RPC_COMMANDS.Add(info.Name, ptypes.ToArray());
+                    }
+                }
+            }
         }
         
         client.MessageReceived += Client_MessageReceived;
 
+        InvokeRepeating("ServerTick", 1.0f, 2.0f);
+
         //DontDestroyOnLoad(gameObject);
     }
 
+    void ServerTick()
+    {
+
+    }
 
     /// <summary>
     ///     Called when a message is received from the server.
@@ -229,10 +303,42 @@ private void Start()
                         }                        
                     }                                     
                 }
+                else if (message.Tag == RiftTags.RPC)
+                {
+                    Debug.Log("Recieved Server RPC Command");
+                    object convertedStream;
+
+                    ushort id = reader.ReadUInt16();
+                    ushort owner = reader.ReadUInt16();
+                    string method = reader.ReadString();
+                    byte[] bytes = reader.ReadBytes();
+
+                    Debug.Log($@"Got bytes size:{bytes.Length}");
+
+                    IFormatter formatter = new BinaryFormatter();
+                    RiftView rv = new RiftView(id, owner);
+
+                    using (MemoryStream memoryStream = new MemoryStream(bytes))
+                    {
+                        RiftStream stream;
+
+                        convertedStream = formatter.Deserialize(memoryStream);
+                        Debug.Log($@"Deserialized stream = {convertedStream}");
+
+                        stream = new RiftStream(false, null);
+                        stream.SetReadStream(((object[])convertedStream), 0);
+
+                        RPCDataView dataView = new RPCDataView(rv, method, stream);
+                        if (riftGameObjects.ContainsKey(rv))
+                        {
+                            riftGameObjects[rv].GetComponent<RiftPlayerController>().BroadcastMessage("ProcessRPC", dataView);
+                        }
+                    }
+                }
             }
         }
-        }
     }
+}
 
 
 

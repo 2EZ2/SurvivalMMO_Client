@@ -58,9 +58,10 @@ public class RiftPlayerController : RiftBehaviour
     {
         if (IsMine)
         {
-            float horizontal = Input.GetAxis("Horizontal");
-            float vertical = Input.GetAxis("Vertical");
-
+            if (Input.GetKeyDown(KeyCode.E))
+            {
+                ShootGun();
+            }
 
             if (Vector3.SqrMagnitude(transform.position - lastPosition) > 0.1f ||
                 Vector3.SqrMagnitude(transform.eulerAngles - lastRotation) > 5f) 
@@ -73,6 +74,7 @@ public class RiftPlayerController : RiftBehaviour
             RemoteUpdateTransform();
         }
     }
+
     private void FixedUpdate()
     {
         if (IsMine)
@@ -81,8 +83,8 @@ public class RiftPlayerController : RiftBehaviour
             float vertical = Input.GetAxis("Vertical");
 
             Vector3 desiredMove = transform.forward * vertical + transform.right * horizontal;
-            m_MoveDir.x = desiredMove.x * 100f;
-            m_MoveDir.z = desiredMove.z * 100f;
+            m_MoveDir.x = desiredMove.x * 50f;
+            m_MoveDir.z = desiredMove.z * 50f;
 
             m_CharacterController.Move(m_MoveDir * Time.fixedDeltaTime);
         }
@@ -111,18 +113,25 @@ public class RiftPlayerController : RiftBehaviour
         lastRotation = new vec3(transform.rotation.x, transform.rotation.y, transform.rotation.z);
     }
 
+    public void ShootGun()
+    {       
+        _RiftView.RPC("ShootGunRPC", RPCTarget.Everyone, 10, "was Mad");
+    }
+
+    [RiftRPC]
+    public void ShootGunRPC(int damage, string reason)
+    {
+        Debug.Log($@"Remote Gun Shot did {damage} because {reason}");
+    }
+
     public override void OnStreamSerializeEvent(RiftStream stream)
     {
-        if (stream.IsWriting)
-        {
-            stream.SendNext(new vec3(transform.position));
-            stream.SendNext(new vec3(transform.rotation.x, transform.rotation.y, transform.rotation.z));
-        }
+        stream.SendNext(new vec3(transform.position));
+        stream.SendNext(new vec3(transform.rotation.eulerAngles));
     }
 
     public override void OnStreamDeserializeEvent(RiftStream stream)
     {
-        Debug.Log("Deserializing player movement stream");
         NewPosition = (Vector3)((vec3)stream.ReceiveNext());
         NewRotation = (Vector3)((vec3)stream.ReceiveNext());
     }

@@ -7,3 +7,8 @@ public class RiftSyncVar : Attribute
 {
 
 }
+
+public class RiftRPC : Attribute
+{
+    
+}

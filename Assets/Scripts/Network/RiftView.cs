@@ -46,6 +46,34 @@ public class RiftView
     {
         return (int)(this.ID * 23 + this.Owner * 29);
     }
+
+    public void RPC(string methodName, RPCTarget target, params object[] inputs)
+    {
+        RiftManager.SendRPC(this, target, methodName, inputs);
+    }
+
+    public void RPC(string methodName, RiftView targetView, params object[] inputs)
+    {
+        RiftManager.SendRPC(this, RPCTarget.EveryoneElse, methodName, inputs);
+    }
+}
+
+public enum RPCTarget { Everyone, EveryoneElse}
+
+[System.Serializable]
+public class RPCDataView
+{
+    public RiftView targetRiftView { get; set; }
+    public string MethodName { get; set; }
+
+    public RiftStream parameterValues { get; set; }
+
+    public RPCDataView(RiftView targetRiftView, string methodName, RiftStream parameterValues)
+    {
+        this.targetRiftView = targetRiftView;
+        MethodName = methodName;
+        this.parameterValues = parameterValues;
+    }
 }
 
 [System.Serializable]
