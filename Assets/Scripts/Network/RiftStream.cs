@@ -22,6 +22,10 @@ public class RiftStream
         {
             this.readData = incomingData;
         }
+        else if(write && incomingData != null)
+        {
+            writeData.AddRange(incomingData);
+        }
     }
 
     public void SetReadStream(object[] incomingData, int pos = 0)

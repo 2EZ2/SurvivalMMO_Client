@@ -1,4 +1,5 @@
 using DarkRift;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
@@ -8,17 +9,17 @@ using UnityEngine;
 ///     Holds serializable data about a player.
 /// </summary>
 [System.Serializable]
-public class RiftView
+public class RiftView : IDarkRiftSerializable, ISerializable
 {
-    public ushort ID { get; set; }
+    public Guid ID { get; set; }
     public ushort Owner { get; set; }
 
     public RiftView()
     {
-        ID = 99;
+        ID = Guid.NewGuid();
         Owner = 100;
     }
-    public RiftView(ushort id, ushort owner)
+    public RiftView(Guid id, ushort owner)
     {
         ID = id;
         Owner = owner;
@@ -44,17 +45,89 @@ public class RiftView
     /// <returns>hash code.</returns>
     public override int GetHashCode()
     {
-        return (int)(this.ID * 23 + this.Owner * 29);
+        return (int)(ID.GetHashCode() + this.Owner.GetHashCode());
     }
 
+
+    public void SendRPC(RPCTarget target, string method, params object[] inputs)
+    {
+        //Serialize
+        using (DarkRiftWriter writer = DarkRiftWriter.Create())
+        {
+            writer.Write(ID.ToByteArray());
+            writer.Write(Owner);
+            writer.Write(method);
+            object[] streamCache = inputs;
+            writer.WriteAs(typeof(object), streamCache);
+
+            if (target == RPCTarget.Everyone)
+            {
+                writer.Write(false);
+            }
+            else
+            {
+                writer.Write(true);
+            }
+
+            Debug.Log($@"Running RPC {method}");
+            //Send
+            using (Message message = Message.Create(RiftTags.RPC, writer))
+                RiftManager.Instance.client.SendMessage(message, SendMode.Reliable);
+        }
+    }
+
+    public void SendPrivateRPC(RiftView target, string method, params object[] inputs)
+    {
+        //Serialize
+        using (DarkRiftWriter writer = DarkRiftWriter.Create())
+        {
+            writer.Write(ID.ToByteArray());
+            writer.Write(Owner);
+            writer.Write(method);
+            object[] streamCache = inputs;
+            writer.WriteAs(typeof(object), streamCache);
+            writer.Write(true); //self exclusion
+            writer.Write(target.ID.ToByteArray());
+            writer.Write(target.Owner);
+
+            Debug.Log($@"Running RPC {method}");
+            //Send
+            using (Message message = Message.Create(RiftTags.PrivateRPC, writer))
+                RiftManager.Instance.client.SendMessage(message, SendMode.Reliable);
+        }
+    }
     public void RPC(string methodName, RPCTarget target, params object[] inputs)
     {
-        RiftManager.SendRPC(this, target, methodName, inputs);
+        SendRPC(target, methodName, inputs);
     }
 
     public void RPC(string methodName, RiftView targetView, params object[] inputs)
     {
-        RiftManager.SendRPC(this, RPCTarget.EveryoneElse, methodName, inputs);
+        SendPrivateRPC(targetView, methodName, inputs);
+    }
+
+    public void Deserialize(DeserializeEvent e)
+    {
+        byte[] id = e.Reader.ReadBytes();        
+        ID = new Guid(id);
+        Owner = e.Reader.ReadUInt16();
+    }
+
+    public void Serialize(SerializeEvent e)
+    {
+        e.Writer.Write(ID.ToByteArray());
+        e.Writer.Write(Owner);
+    }
+
+    public RiftView(SerializationInfo info, StreamingContext ctxt)
+    {
+        ID = (Guid)info.GetValue("ID", typeof(Guid));
+        Owner = (ushort)info.GetValue("OWN", typeof(ushort));
+    }
+    public void GetObjectData(SerializationInfo info, StreamingContext context)
+    {
+        info.AddValue("ID", ID);
+        info.AddValue("OWN", Owner);
     }
 }
 

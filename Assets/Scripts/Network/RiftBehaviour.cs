@@ -21,22 +21,6 @@ public class RiftBehaviour : MonoBehaviour
 
     public bool IsMine { get => client.ID == _RiftView.Owner; }
 
-
-    public virtual RiftStream OnStreamSerializeEvent(RiftStream Stream)
-    {
-        return Stream;
-    }
-
-    public virtual void OnStreamDeserializeEvent(RiftStream Stream)
-    {
-
-    }
-
-    public virtual void SendStreamSerializeEvent()
-    {
-
-    }
-
     public void ProcessRPC(RPCDataView view)
     {       
         foreach(MethodInfo info in this.GetType().GetMethods())
@@ -65,12 +49,13 @@ public class RiftBehaviour : MonoBehaviour
     /// </summary>
     /// <param name="client">The client to send data using.</param>
     /// <param name="blockWorld">The block world reference.</param>
-    public RiftBehaviour Setup(UnityClient client, ushort id, ushort owner)
+    public RiftBehaviour Setup(UnityClient client, RiftView view)
     {
         this.client = client;
-        this._RiftView = new RiftView(id, owner);
+        this._RiftView = view;
         return this;
     }
+
 }
 
 

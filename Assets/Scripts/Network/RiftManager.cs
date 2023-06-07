@@ -15,7 +15,10 @@ using System.Linq;
 
 public class RiftManager : MonoBehaviour
 {
-    public static RiftManager Instance { get; private set; }   
+    public static RiftManager Instance { get; private set; }
+
+    public RiftSerializationController streamSerializer;
+
     /// <summary>
     ///     The unit client we communicate via.
     /// </summary>
@@ -23,95 +26,20 @@ public class RiftManager : MonoBehaviour
     [Tooltip("The client to communicate with the server via.")]
     public UnityClient client;
 
-    public RiftView localPlayer = new RiftView(0, 0);
-
-    public static Dictionary<ushort, RiftView> players = new Dictionary<ushort, RiftView>();
+    public static List<ushort> clients = new List<ushort>();
     
-
     public static Dictionary<RiftView, GameObject> riftGameObjects = new Dictionary<RiftView, GameObject>();
-    /// <summary>
-    ///     The player object to spawn for our player.
-    /// </summary>
-    [SerializeField]
-    [Tooltip("The player object to spawn.")]
-    GameObject playerPrefab;
-
-    /// <summary>
-    ///     The player object to spawn for others' players.
-    /// </summary>
-    [SerializeField]
-    [Tooltip("The network player object to spawn.")]
-    GameObject networkPlayerPrefab;
-
-    public static Dictionary<string, Type[]> RPC_COMMANDS = new Dictionary<string, Type[]>();
-
+    
     public static Dictionary<RiftView, Type> View_Behaviour = new Dictionary<RiftView, Type>();
+
+    public List<GameObject> spawnableObjects = new List<GameObject>();
+
+
+
 
     public static Dictionary<string, List<Type>> Behaviour_SyncVars = new Dictionary<string, List<Type>>();
 
-    public static void SendSync(RiftView view, RiftStream stream)
-    {
-        //Serialize
-        using (DarkRiftWriter writer = DarkRiftWriter.Create())
-        {
-            writer.Write(view.ID);
-            writer.Write(view.Owner);
-            object[] streamCache = stream.GetWriteStream().ToArray();
-            writer.WriteAs(typeof(object), streamCache);
-            
-            //Send
-            using (Message message = Message.Create(RiftTags.SendStream, writer))
-               RiftManager.Instance.client.SendMessage(message, SendMode.Unreliable);
-        }
-    }
-
-    public static void SendRPC(RiftView view, RPCTarget target, string method, params object[] inputs)
-    {        
-        //Serialize
-        using (DarkRiftWriter writer = DarkRiftWriter.Create())
-        {
-            writer.Write(view.ID);
-            writer.Write(view.Owner);
-            writer.Write(method);
-            object[] streamCache = inputs;
-            writer.WriteAs(typeof(object), streamCache);
-            
-            if(target == RPCTarget.Everyone)
-            {
-                writer.Write(false);
-            }
-            else
-            {
-                writer.Write(true);
-            }
-
-            Debug.Log($@"Running RPC {method}");
-            //Send
-            using (Message message = Message.Create(RiftTags.RPC, writer))
-                RiftManager.Instance.client.SendMessage(message, SendMode.Reliable);
-        }
-    }
-
-    public static void SendPrivateRPC(RiftView sender, RiftView target, string method, params object[] inputs)
-    {
-        //Serialize
-        using (DarkRiftWriter writer = DarkRiftWriter.Create())
-        {
-            writer.Write(sender.ID);
-            writer.Write(sender.Owner);
-            writer.Write(method);
-            object[] streamCache = inputs;
-            writer.WriteAs(typeof(object), streamCache);
-            writer.Write(true);
-            writer.Write(sender.ID);
-            writer.Write(sender.Owner);
-
-            Debug.Log($@"Running RPC {method}");
-            //Send
-            using (Message message = Message.Create(RiftTags.PrivateRPC, writer))
-                RiftManager.Instance.client.SendMessage(message, SendMode.Reliable);
-        }
-    }
+    
 
     private void Start()
     {
@@ -130,13 +58,11 @@ public class RiftManager : MonoBehaviour
             return;
         }
 
-        localPlayer.ID = client.ID;
-        localPlayer.Owner = client.ID;
+        //localPlayer.ID = client.ID;
+        //localPlayer.Owner = client.ID;
         Debug.Log(client.ID);
 
         GetAllSyncVars();
-        GetAllRPCs();
-
 
         client.MessageReceived += Client_MessageReceived;
 
@@ -145,34 +71,6 @@ public class RiftManager : MonoBehaviour
         //DontDestroyOnLoad(gameObject);
     }
 
-    void GetAllRPCs()
-    {
-        RPC_COMMANDS.Clear();
-        var types = Assembly.GetAssembly(typeof(RiftBehaviour)).GetTypes().Where(myType => myType.IsClass && !myType.IsAbstract && myType.IsSubclassOf(typeof(RiftBehaviour)));
-        foreach (var field in types)
-        {
-            foreach (MethodInfo info in field.GetMethods())
-            {
-                if (info.GetCustomAttribute<RiftRPC>() != null)
-                {
-                    Debug.Log($@"Found RPC: {info.Name} in {field.Name}");
-
-                    if (!RPC_COMMANDS.ContainsKey(info.Name))
-                    {
-                        List<Type> ptypes = new List<Type>();
-
-                        foreach (var item in info.GetParameters())
-                        {
-                            Debug.Log($@"RPC:{info.Name} has parameter {item.ParameterType}");
-                            ptypes.Add(item.ParameterType);
-                        }
-
-                        RPC_COMMANDS.Add(info.Name, ptypes.ToArray());
-                    }
-                }
-            }
-        }
-    }
 
     void GetAllSyncVars()
     {
@@ -208,20 +106,37 @@ public class RiftManager : MonoBehaviour
 
     void ServerTick()
     {
-        RiftBehaviour[] behaviours = GameObject.FindObjectsByType<RiftBehaviour>(FindObjectsSortMode.InstanceID);
+        streamSerializer.SendSerializationSync();
+    }
 
-        //Seralize event
-        foreach(var rb in behaviours)
-        {
-            if(rb._RiftView.Owner == client.ID)
-            {
-                RiftStream stream = new RiftStream(true, null);
-                SendSync(rb._RiftView, rb.OnStreamSerializeEvent(stream));
-            }           
-        }
+    public void SendSyncVars()
+    {
+        RiftBehaviour[] behaviours = GameObject.FindObjectsByType<RiftBehaviour>(FindObjectsSortMode.InstanceID);
+        //Get All class of type Rift Behaviour
+        var types = Assembly.GetAssembly(typeof(RiftBehaviour)).GetTypes().Where(myType => myType.IsClass && !myType.IsAbstract && myType.IsSubclassOf(typeof(RiftBehaviour)));
 
         //Send sync var loop
-            
+        foreach (var field in types)
+        {
+            foreach (PropertyInfo info in field.GetProperties())
+            {
+                if (info.GetCustomAttribute<RiftSyncVar>() != null)
+                {
+                    Debug.Log($@"sync var {info.PropertyType} {info.Name} in {field.Name}");
+
+                    foreach (var rb in behaviours)
+                    {
+                        if (field.IsAssignableFrom(rb.GetType()))
+                        {
+                            if(rb._RiftView.Owner == client.ID)
+                            {
+
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -236,133 +151,50 @@ public class RiftManager : MonoBehaviour
             using (DarkRiftReader reader = message.GetReader())
             {
                 //Read message
-                Debug.Log($@"Recieved server message tag:{message.Tag}");
                 if (message.Tag == RiftTags.PlayerConnected)
                 {
                     ushort id = reader.ReadUInt16();
-                    ushort owner = reader.ReadUInt16();
-                    RiftView view = new RiftView(id, owner);
-
-                    GameObject obj = Instantiate(playerPrefab);
-                    RiftBehaviour behaviour = obj.GetComponent<RiftPlayerController>().Setup(client, id, owner);
-
-                    if (!riftGameObjects.ContainsKey(view))
+                    if (clients.Contains(id))
                     {
-                        riftGameObjects.Add(view, obj);
+                        clients.Add(id);
                     }
-
-                    if (!players.ContainsKey(id))
-                    {
-                        players.Add(id, view);
-                    }
-
-                    if (!View_Behaviour.ContainsKey(view))
-                    {
-                        View_Behaviour.Add(view, behaviour.GetType());
-                    }
-                                       
                 }
                 else if (message.Tag == RiftTags.PlayerDisconnected)
                 {
                     ushort id = reader.ReadUInt16();
-                    ushort owner = reader.ReadUInt16();
 
-                    if (players.ContainsKey(id))
+                    if (clients.Contains(id))
                     {
-                        players.Remove(id);
+                        clients.Remove(id);
                     }
                 }
-                else if (message.Tag == RiftTags.SpawnPlayer)
+                else if (message.Tag == RiftTags.InsantiateObject)
                 {
-                    ushort id = reader.ReadUInt16();
-                    ushort owner = reader.ReadUInt16();
-                    RiftView view = new RiftView(id, owner);
+                    RiftView view = reader.ReadSerializable<RiftView>();
+                    ushort index = reader.ReadUInt16();
 
-                    GameObject obj = Instantiate(playerPrefab);
-                    RiftBehaviour behaviour = obj.GetComponent<RiftPlayerController>().Setup(client, id, owner);
-
-                    if (!riftGameObjects.ContainsKey(view))
-                    {
-                        riftGameObjects.Add(view, obj);
-                    }
-
-                    if (!players.ContainsKey(id))
-                    {
-                        players.Add(id, view);
-                    }
-
-                    if (!View_Behaviour.ContainsKey(view))
-                    {
-                        View_Behaviour.Add(view, behaviour.GetType());
-                    }
-
-                }
-                else if (message.Tag == RiftTags.ReceivingStream)
-                {
-                    Debug.Log("Recieved Server Message to stream");
-                    object convertedStream;
-
-                    ushort id = reader.ReadUInt16();
-                    ushort owner = reader.ReadUInt16();
-                    byte[] bytes = reader.ReadBytes();
-
-                    Debug.Log($@"Got bytes size:{bytes.Length}");
-
-                    IFormatter formatter = new BinaryFormatter();
-                    RiftView rv = new RiftView(id, owner);
-
-                    using (MemoryStream memoryStream = new MemoryStream(bytes))
-                    {
-                        RiftStream stream;
-
-                        convertedStream = formatter.Deserialize(memoryStream);
-                        Debug.Log($@"Deserialized stream = {convertedStream}");
-                        if (id != client.ID)
-                        {
-                            stream = new RiftStream(false, null);
-                            stream.SetReadStream(((object[])convertedStream),0);
-
-                            if (riftGameObjects.ContainsKey(rv))
-                            {
-                                riftGameObjects[rv].GetComponent<RiftPlayerController>().OnStreamDeserializeEvent(stream);
-                            }                            
-                        }                        
-                    }                                     
-                }
-                else if (message.Tag == RiftTags.RPC)
-                {
-                    Debug.Log("Recieved Server RPC Command");
-                    object convertedStream;
-
-                    ushort id = reader.ReadUInt16();
-                    ushort owner = reader.ReadUInt16();
-                    string method = reader.ReadString();
-                    byte[] bytes = reader.ReadBytes();
-
-                    Debug.Log($@"Got bytes size:{bytes.Length}");
-
-                    IFormatter formatter = new BinaryFormatter();
-                    RiftView rv = new RiftView(id, owner);
-
-                    using (MemoryStream memoryStream = new MemoryStream(bytes))
-                    {
-                        RiftStream stream;
-
-                        convertedStream = formatter.Deserialize(memoryStream);
-                        Debug.Log($@"Deserialized stream = {convertedStream}");
-
-                        stream = new RiftStream(false, null);
-                        stream.SetReadStream(((object[])convertedStream), 0);
-
-                        RPCDataView dataView = new RPCDataView(rv, method, stream);
-                        if (riftGameObjects.ContainsKey(rv))
-                        {
-                            riftGameObjects[rv].GetComponent<RiftPlayerController>().BroadcastMessage("ProcessRPC", dataView);
-                        }
-                    }
+                    RiftManager.Instance.NetworkSpawn(index, transform.position, view);
                 }
             }
         }
+    }
+
+    public GameObject NetworkSpawn(ushort prefabIndex, Vector3 position, RiftView view)
+    {
+        GameObject obj = Instantiate(spawnableObjects[prefabIndex]);
+        RiftBehaviour behaviour = obj.GetComponent<RiftBehaviour>().Setup(client, view);
+
+        if (!riftGameObjects.ContainsKey(view))
+        {
+            riftGameObjects.Add(view, obj);
+        }
+
+        if (!View_Behaviour.ContainsKey(view))
+        {
+            View_Behaviour.Add(view, behaviour.GetType());
+        }
+
+        return obj;
     }
 }
 
@@ -571,9 +403,9 @@ public static class DarkRiftReaderExtension
         }
         else if (type == typeof(RiftView))
         {
-            ushort id = reader.ReadUInt16();
+            byte[] id = reader.ReadBytes();
             ushort owner = reader.ReadUInt16();
-            return new RiftView(id, owner);
+            return new RiftView(new Guid(id), owner);
         }
 
         return null;

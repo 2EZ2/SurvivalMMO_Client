@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class RiftPlayerController : RiftBehaviour
+public class RiftPlayerController : RiftBehaviour, IRiftSerializable
 {
     /// <summary>
     ///     The speed to lerp the player's position.
@@ -29,6 +29,10 @@ public class RiftPlayerController : RiftBehaviour
     public Vector3 NewRotation { get; set; }
 
 
+    [RiftSyncVar]
+    public int Health { get => health; set => health = value; }
+
+
     /// <summary>
     ///     The last position our character was at.
     /// </summary>
@@ -41,8 +45,8 @@ public class RiftPlayerController : RiftBehaviour
     public CharacterController m_CharacterController;
     private Vector3 m_MoveDir = Vector3.zero;
 
-    [RiftSyncVar]
-    public int Health = 100;
+    
+    private int health = 100;
 
     // Start is called before the first frame update
     void Start()
@@ -62,13 +66,7 @@ public class RiftPlayerController : RiftBehaviour
             if (Input.GetKeyDown(KeyCode.E))
             {
                 ShootGun();
-            }
-
-            if (Vector3.SqrMagnitude(transform.position - lastPosition) > 0.1f ||
-                Vector3.SqrMagnitude(transform.eulerAngles - lastRotation) > 5f) 
-            { 
-                //SendStreamSerializeEvent(); 
-            }           
+            }        
         }
         else
         {
@@ -103,17 +101,6 @@ public class RiftPlayerController : RiftBehaviour
         );
     }
 
-    public override void SendStreamSerializeEvent()
-    {
-        RiftStream stream = new RiftStream(true, null);      
-        stream.SendNext(new vec3(transform.position));
-        stream.SendNext(new vec3(transform.rotation.x, transform.rotation.y, transform.rotation.z));
-        RiftManager.SendSync(this._RiftView, stream);
-
-        lastPosition = transform.position;
-        lastRotation = new vec3(transform.rotation.x, transform.rotation.y, transform.rotation.z);
-    }
-
     public void ShootGun()
     {       
         _RiftView.RPC("ShootGunRPC", RPCTarget.Everyone, 10, "was Mad");
@@ -125,21 +112,16 @@ public class RiftPlayerController : RiftBehaviour
         Debug.Log($@"Remote Gun Shot did {damage} because {reason}");
     }
 
-    public override RiftStream OnStreamSerializeEvent(RiftStream stream)
+    public void OnStreamSerializeEvent(RiftStream inStream)
     {
-        if (stream.IsWriting)
-        {
-            stream.SendNext(new vec3(transform.position));
-            stream.SendNext(new vec3(transform.rotation.eulerAngles));
+        inStream.SendNext(new vec3(transform.position));
+        inStream.SendNext(new vec3(transform.rotation.eulerAngles));
 
-            lastPosition = transform.position;
-            lastRotation = transform.rotation.eulerAngles;
-        }
-        
-        return stream;
+        lastPosition = transform.position;
+        lastRotation = transform.rotation.eulerAngles;
     }
 
-    public override void OnStreamDeserializeEvent(RiftStream stream)
+    public void OnStreamDeserializeEvent(RiftStream stream)
     {
         NewPosition = (Vector3)((vec3)stream.ReceiveNext());
         NewRotation = (Vector3)((vec3)stream.ReceiveNext());
