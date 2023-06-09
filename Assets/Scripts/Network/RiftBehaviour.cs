@@ -7,28 +7,27 @@ using System;
 using DarkRift.Client.Unity;
 using System.Reflection;
 
+[RequireComponent(typeof(RiftIdentity))]
 public class RiftBehaviour : MonoBehaviour
 {
-    /// <summary>
-    ///     The DarkRift client to send data though.
-    /// </summary>
-    UnityClient client;
+    public RiftIdentity Identity { get; set; }
 
-    [SerializeField]
-    private RiftView riftView = new RiftView();
-   
-    public RiftView _RiftView { get => riftView; set => riftView = value; }
+    public bool IsMine { get => Identity?.IsMine ?? false; }
 
-    public bool IsMine { get => client.ID == _RiftView.Owner; }
+    private MethodInfo[] methodsCache { get; set; }
 
     public void ProcessRPC(RPCDataView view)
     {       
-        foreach(MethodInfo info in this.GetType().GetMethods())
+        if(methodsCache == null)
+        {
+            methodsCache = this.GetType().GetMethods();
+        }
+
+        foreach(MethodInfo info in methodsCache)
         {
             if(info.Name == view.MethodName)
             {
-                Debug.Log($@"parameter count:{info.GetParameters().Length}, buffer length: {view.parameterValues.ToArray().Length}");
-                info.Invoke(this, view.parameterValues.ToArray());
+                info.Invoke(this, view.Inputs);
             }
         }
     }
@@ -44,17 +43,7 @@ public class RiftBehaviour : MonoBehaviour
         }
     }
 
-    /// <summary>
-    ///     Sets up the character with necessary references.
-    /// </summary>
-    /// <param name="client">The client to send data using.</param>
-    /// <param name="blockWorld">The block world reference.</param>
-    public RiftBehaviour Setup(UnityClient client, RiftView view)
-    {
-        this.client = client;
-        this._RiftView = view;
-        return this;
-    }
+   
 
 }
 

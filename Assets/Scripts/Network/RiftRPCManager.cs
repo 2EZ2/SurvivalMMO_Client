@@ -12,8 +12,6 @@ using UnityEngine;
 
 public class RiftRPCManager : MonoBehaviour
 {
-    public static Dictionary<string, Type[]> RPC_COMMANDS = new Dictionary<string, Type[]>();
-
     /// <summary>
     ///     The unit client we communicate via.
     /// </summary>
@@ -25,8 +23,6 @@ public class RiftRPCManager : MonoBehaviour
     void Start()
     {
         client.MessageReceived += Client_MessageReceived;
-
-        GetAllRPCs();
     }
 
     // Update is called once per frame
@@ -43,33 +39,19 @@ public class RiftRPCManager : MonoBehaviour
             {
                 if (message.Tag == RiftTags.RPC)
                 {
+                    RPCDataView dataView = reader.ReadSerializable<RPCDataView>();
+
                     Debug.Log("Recieved Server RPC Command");
-                    object convertedStream;
 
-                    RiftView rv = reader.ReadSerializable<RiftView>();
-
-                    string method = reader.ReadString();
-                    byte[] bytes = reader.ReadBytes();
-
-                    Debug.Log($@"Got bytes size:{bytes.Length}");
-
-                    IFormatter formatter = new BinaryFormatter();
-
-                    using (MemoryStream memoryStream = new MemoryStream(bytes))
+                    if (RiftManager.riftGameObjects.ContainsKey(dataView.TargetRiftView))
                     {
-                        RiftStream stream;
+                        var tempComponent = RiftManager.riftGameObjects[dataView.TargetRiftView].GetComponent(dataView.SystemType);
 
-                        convertedStream = formatter.Deserialize(memoryStream);
-                        Debug.Log($@"Deserialized stream = {convertedStream}");
-
-                        stream = new RiftStream(false, null);
-                        stream.SetReadStream(((object[])convertedStream), 0);
-
-                        RPCDataView dataView = new RPCDataView(rv, method, stream);
-                        if (RiftManager.riftGameObjects.ContainsKey(rv))
+                        if(tempComponent != null)
                         {
-                            RiftManager.riftGameObjects[rv].GetComponent<RiftPlayerController>().BroadcastMessage("ProcessRPC", dataView);
-                        }
+                            tempComponent.BroadcastMessage("ProcessRPC", dataView);
+                        }   
+                            
                     }
                 }
             }
@@ -77,19 +59,14 @@ public class RiftRPCManager : MonoBehaviour
                 
     }
 
-    public static void SendPrivateRPC(RiftView sender, RiftView target, string method, params object[] inputs)
+    public static void SendPrivateRPC(RiftView sender, RiftView target, string type, string method, object[] inputs)
     {
         //Serialize
         using (DarkRiftWriter writer = DarkRiftWriter.Create())
         {
-            writer.Write(sender.ID.ToByteArray());
-            writer.Write(sender.Owner);
-            writer.Write(method);
-            object[] streamCache = inputs;
-            writer.WriteAs(typeof(object), streamCache);
-            writer.Write(true); //self exclusion
-            writer.Write(sender.ID.ToByteArray());
-            writer.Write(sender.Owner);
+            RPCDataView dataView = new RPCDataView(sender, target, type, method, false, inputs);
+
+            writer.Write<RPCDataView>(dataView);
 
             Debug.Log($@"Running RPC {method}");
             //Send
@@ -99,60 +76,95 @@ public class RiftRPCManager : MonoBehaviour
     }
 
 
-    public static void SendRPC(RiftView view, RPCTarget target, string method, params object[] inputs)
+    public static void SendRPC(RiftView sender, RPCTarget target, string type, string method, object[] inputs)
     {
         //Serialize
         using (DarkRiftWriter writer = DarkRiftWriter.Create())
         {
-            writer.Write(view.ID.ToByteArray());
-            writer.Write(view.Owner);
-            writer.Write(method);
-            object[] streamCache = inputs;
-            writer.WriteAs(typeof(object), streamCache);
+            RPCDataView dataView;
 
             if (target == RPCTarget.Everyone)
             {
-                writer.Write(false);
+                dataView = new RPCDataView(sender, sender, type, method, true, inputs);
             }
             else
             {
-                writer.Write(true);
+                dataView = new RPCDataView(sender, sender, type, method, false, inputs);
             }
+             
+            writer.Write<RPCDataView>(dataView);
 
             Debug.Log($@"Running RPC {method}");
             //Send
             using (Message message = Message.Create(RiftTags.RPC, writer))
                 RiftManager.Instance.client.SendMessage(message, SendMode.Reliable);
         }
+    }   
+}
+
+public enum RPCTarget { Everyone, EveryoneElse }
+
+[System.Serializable]
+public class RPCDataView : IDarkRiftSerializable
+{
+    public RiftView SenderView { get; set; }
+    public RiftView TargetRiftView { get; set; }
+
+    public string SystemType { get; set; }
+
+    public string MethodName { get; set; }
+
+    public bool RepeatToClient { get; set; }
+
+    public object[] Inputs { get; set; }
+
+    public RPCDataView()
+    {
+        this.SenderView = new RiftView();
+        this.TargetRiftView = new RiftView();
+        this.SystemType = "";
+        this.MethodName = "";
+        this.RepeatToClient = true;
+        this.Inputs = new object[1];
     }
 
-    void GetAllRPCs()
+    public RPCDataView(RiftView sender, RiftView targetRiftView, string componentName, string methodName, bool repeatToClient, object[] inputs)
     {
-        RPC_COMMANDS.Clear();
-        var types = Assembly.GetAssembly(typeof(RiftBehaviour)).GetTypes().Where(myType => myType.IsClass && !myType.IsAbstract && myType.IsSubclassOf(typeof(RiftBehaviour)));
-        foreach (var field in types)
+        this.SenderView = sender;
+        this.TargetRiftView = targetRiftView;
+        this.SystemType = componentName;
+        this.MethodName = methodName;
+        this.RepeatToClient = repeatToClient;
+        this.Inputs = inputs;
+    }
+
+    public void Deserialize(DeserializeEvent e)
+    {
+        SenderView = e.Reader.ReadSerializable<RiftView>();
+        TargetRiftView = e.Reader.ReadSerializable<RiftView>();
+        SystemType = e.Reader.ReadString();
+        MethodName = e.Reader.ReadString();
+        RepeatToClient = e.Reader.ReadBoolean();
+
+        byte[] bytes = e.Reader.ReadBytes();
+
+        IFormatter formatter = new BinaryFormatter();
+
+        using (MemoryStream memoryStream = new MemoryStream(bytes))
         {
-            foreach (MethodInfo info in field.GetMethods())
-            {
-                if (info.GetCustomAttribute<RiftRPC>() != null)
-                {
-                    Debug.Log($@"Found RPC: {info.Name} in {field.Name}");
+            object convertedStream = formatter.Deserialize(memoryStream);
 
-                    if (!RPC_COMMANDS.ContainsKey(info.Name))
-                    {
-                        List<Type> ptypes = new List<Type>();
-
-                        foreach (var item in info.GetParameters())
-                        {
-                            Debug.Log($@"RPC:{info.Name} has parameter {item.ParameterType}");
-                            ptypes.Add(item.ParameterType);
-                        }
-
-                        RPC_COMMANDS.Add(info.Name, ptypes.ToArray());
-                    }
-                }
-            }
+            this.Inputs = ((object[])convertedStream);
         }
     }
 
+    public void Serialize(SerializeEvent e)
+    {
+        e.Writer.Write<RiftView>(this.SenderView);
+        e.Writer.Write<RiftView>(this.TargetRiftView);
+        e.Writer.Write(this.SystemType);
+        e.Writer.Write(this.MethodName);
+        e.Writer.Write(this.RepeatToClient);
+        e.Writer.WriteAs(typeof(object), Inputs);
+    }
 }

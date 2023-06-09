@@ -66,6 +66,7 @@
     <Compile Include="Assets\Scripts\PlayerControls\RiftPlayerController.cs" />
     <Compile Include="Assets\Scripts\Network\RiftInterfaces.cs" />
     <Compile Include="Assets\DarkRift\DarkRift\Plugins\Server\XmlUnityServer.cs" />
+    <Compile Include="Assets\Scripts\Network\RiftIdentity.cs" />
     <Compile Include="Assets\DarkRift\DarkRift\Plugins\Server\UnityConsoleWriter.cs" />
     <Compile Include="Assets\Scripts\Network\RiftView.cs" />
     <Compile Include="Assets\Scripts\Network\RiftManager.cs" />
@@ -76,6 +77,7 @@
     <Compile Include="Assets\DarkRift\DarkRift\Plugins\Server\UnityServer.cs" />
     <Compile Include="Assets\Scripts\Network\RiftBehaviour.cs" />
     <Compile Include="Assets\DarkRift\DarkRift\Plugins\Client\SerializableObjectCacheSettings.cs" />
+    <Compile Include="Assets\Scripts\Network\TransformSync.cs" />
     <Compile Include="Assets\Scripts\Network\RiftRPCManager.cs" />
   </ItemGroup>
   <ItemGroup>

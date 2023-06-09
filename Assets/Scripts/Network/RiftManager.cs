@@ -34,13 +34,8 @@ public class RiftManager : MonoBehaviour
 
     public List<GameObject> spawnableObjects = new List<GameObject>();
 
-
-
-
     public static Dictionary<string, List<Type>> Behaviour_SyncVars = new Dictionary<string, List<Type>>();
-
     
-
     private void Start()
     {
         if (Instance == null)
@@ -128,7 +123,7 @@ public class RiftManager : MonoBehaviour
                     {
                         if (field.IsAssignableFrom(rb.GetType()))
                         {
-                            if(rb._RiftView.Owner == client.ID)
+                            if(rb.Identity.Owner == client.ID)
                             {
 
                             }
@@ -182,7 +177,7 @@ public class RiftManager : MonoBehaviour
     public GameObject NetworkSpawn(ushort prefabIndex, Vector3 position, RiftView view)
     {
         GameObject obj = Instantiate(spawnableObjects[prefabIndex]);
-        RiftBehaviour behaviour = obj.GetComponent<RiftBehaviour>().Setup(client, view);
+        RiftIdentity behaviour = obj.GetComponent<RiftIdentity>().Setup(client, view);
 
         if (!riftGameObjects.ContainsKey(view))
         {

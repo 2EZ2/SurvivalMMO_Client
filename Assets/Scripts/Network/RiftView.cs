@@ -48,26 +48,39 @@ public class RiftView : IDarkRiftSerializable, ISerializable
         return (int)(ID.GetHashCode() + this.Owner.GetHashCode());
     }
 
-
-    public void SendRPC(RPCTarget target, string method, params object[] inputs)
+    public static void SendPrivateRPC(RiftView sender, RiftView target, string type, string method, object[] inputs)
     {
         //Serialize
         using (DarkRiftWriter writer = DarkRiftWriter.Create())
         {
-            writer.Write(ID.ToByteArray());
-            writer.Write(Owner);
-            writer.Write(method);
-            object[] streamCache = inputs;
-            writer.WriteAs(typeof(object), streamCache);
+            RPCDataView dataView = new RPCDataView(sender, target, type, method, false, inputs);
+
+            writer.Write<RPCDataView>(dataView);
+
+            Debug.Log($@"Running RPC {method}");
+            //Send
+            using (Message message = Message.Create(RiftTags.PrivateRPC, writer))
+                RiftManager.Instance.client.SendMessage(message, SendMode.Reliable);
+        }
+    }
+
+    public static void SendRPC(RiftView sender, RPCTarget target, string type, string method, object[] inputs)
+    {
+        //Serialize
+        using (DarkRiftWriter writer = DarkRiftWriter.Create())
+        {
+            RPCDataView dataView;
 
             if (target == RPCTarget.Everyone)
             {
-                writer.Write(false);
+                dataView = new RPCDataView(sender, sender, type, method, true, inputs);
             }
             else
             {
-                writer.Write(true);
+                dataView = new RPCDataView(sender, sender, type, method, false, inputs);
             }
+
+            writer.Write<RPCDataView>(dataView);
 
             Debug.Log($@"Running RPC {method}");
             //Send
@@ -76,34 +89,14 @@ public class RiftView : IDarkRiftSerializable, ISerializable
         }
     }
 
-    public void SendPrivateRPC(RiftView target, string method, params object[] inputs)
+    public void RPC(string componentName, string methodName, RPCTarget target, params object[] inputs)
     {
-        //Serialize
-        using (DarkRiftWriter writer = DarkRiftWriter.Create())
-        {
-            writer.Write(ID.ToByteArray());
-            writer.Write(Owner);
-            writer.Write(method);
-            object[] streamCache = inputs;
-            writer.WriteAs(typeof(object), streamCache);
-            writer.Write(true); //self exclusion
-            writer.Write(target.ID.ToByteArray());
-            writer.Write(target.Owner);
-
-            Debug.Log($@"Running RPC {method}");
-            //Send
-            using (Message message = Message.Create(RiftTags.PrivateRPC, writer))
-                RiftManager.Instance.client.SendMessage(message, SendMode.Reliable);
-        }
-    }
-    public void RPC(string methodName, RPCTarget target, params object[] inputs)
-    {
-        SendRPC(target, methodName, inputs);
+        SendRPC(this, target, componentName, methodName, inputs);
     }
 
-    public void RPC(string methodName, RiftView targetView, params object[] inputs)
+    public void RPC(string componentName, string methodName, RiftView targetView, params object[] inputs)
     {
-        SendPrivateRPC(targetView, methodName, inputs);
+        SendPrivateRPC(this, targetView, componentName, methodName, inputs);
     }
 
     public void Deserialize(DeserializeEvent e)
@@ -124,6 +117,7 @@ public class RiftView : IDarkRiftSerializable, ISerializable
         ID = (Guid)info.GetValue("ID", typeof(Guid));
         Owner = (ushort)info.GetValue("OWN", typeof(ushort));
     }
+
     public void GetObjectData(SerializationInfo info, StreamingContext context)
     {
         info.AddValue("ID", ID);
@@ -131,23 +125,7 @@ public class RiftView : IDarkRiftSerializable, ISerializable
     }
 }
 
-public enum RPCTarget { Everyone, EveryoneElse}
 
-[System.Serializable]
-public class RPCDataView
-{
-    public RiftView targetRiftView { get; set; }
-    public string MethodName { get; set; }
-
-    public RiftStream parameterValues { get; set; }
-
-    public RPCDataView(RiftView targetRiftView, string methodName, RiftStream parameterValues)
-    {
-        this.targetRiftView = targetRiftView;
-        MethodName = methodName;
-        this.parameterValues = parameterValues;
-    }
-}
 
 [System.Serializable]
 public class vec3 : ISerializable

@@ -12,6 +12,8 @@ public class RiftMessage : IDarkRiftSerializable, ISerializable
 {
     public RiftView View { get; set; }
 
+    public string SystemType { get; set; }
+
     public byte[] data { get; set; }
 
     public object[] message { get; set; }
@@ -19,17 +21,20 @@ public class RiftMessage : IDarkRiftSerializable, ISerializable
     public RiftMessage()
     {
         View = new RiftView(new Guid(), 100);
+        SystemType = string.Empty;
     }
 
-    public RiftMessage(RiftView view)
+    public RiftMessage(RiftView view, string type)
     {
         View = view;
+        SystemType = type;
     }
 
     public void Serialize(SerializeEvent e)
     {
         e.Writer.Write(View.ID.ToByteArray());
         e.Writer.Write(View.Owner);
+        e.Writer.Write(SystemType);
 
         IFormatter formatter = new BinaryFormatter();
 
@@ -55,6 +60,8 @@ public class RiftMessage : IDarkRiftSerializable, ISerializable
 
         View = e.Reader.ReadSerializable<RiftView>();
 
+        SystemType = e.Reader.ReadString();
+
         data = e.Reader.ReadBytes();
 
         IFormatter formatter = new BinaryFormatter();
@@ -70,6 +77,7 @@ public class RiftMessage : IDarkRiftSerializable, ISerializable
     {
         View.ID = (Guid)info.GetValue("ID", typeof(Guid));
         View.Owner = (ushort)info.GetValue("OWN", typeof(ushort));
+        SystemType = (string)info.GetValue("type", typeof(string));
         message = (object[])info.GetValue("DATA", typeof(object[]));   
     }
 
@@ -77,6 +85,8 @@ public class RiftMessage : IDarkRiftSerializable, ISerializable
     {
         info.AddValue("ID", View.ID);
         info.AddValue("OWN", View.Owner);
+        info.AddValue("type", SystemType);
         info.AddValue("DATA", message);
+        
     }
 }

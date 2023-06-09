@@ -2,6 +2,8 @@ using DarkRift;
 using DarkRift.Client.Unity;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using UnityEngine;
 
 public class RiftSerializationController : MonoBehaviour
@@ -12,6 +14,9 @@ public class RiftSerializationController : MonoBehaviour
     [SerializeField]
     [Tooltip("The client to communicate with the server via.")]
     public UnityClient client;
+
+
+    private TypeInfo[] cachedRiftSerializableTypes;
 
     // Start is called before the first frame update
     void Start()
@@ -41,7 +46,6 @@ public class RiftSerializationController : MonoBehaviour
                 {
                     RiftMessage[] messages = reader.ReadSerializables<RiftMessage>();
 
-
                     foreach (RiftMessage _message in messages)
                     {
                         if (_message.View.Owner != client.ID)
@@ -51,7 +55,12 @@ public class RiftSerializationController : MonoBehaviour
 
                             if (RiftManager.riftGameObjects.ContainsKey(_message.View))
                             {
-                                RiftManager.riftGameObjects[_message.View].GetComponent<RiftPlayerController>().OnStreamDeserializeEvent(stream);
+                                var tempComp = RiftManager.riftGameObjects[_message.View].GetComponent(_message.SystemType);
+
+                                if (tempComp != null)
+                                {
+                                    ((IRiftSerializable)tempComp)?.OnStreamDeserializeEvent(stream);                                    
+                                }
                             }
                         }
                     }
@@ -61,55 +70,45 @@ public class RiftSerializationController : MonoBehaviour
                 
     }
 
-    public static void SendMessages(RiftView view, List<RiftMessage> messages)
-    {
-        //Serialize
-        using (DarkRiftWriter writer = DarkRiftWriter.Create())
-        {
-            foreach (RiftMessage _message in messages)
-            {
-                writer.Write<RiftMessage>(_message);
-            }
-
-            //Send
-            using (Message message = Message.Create(RiftTags.SendStream, writer))
-                RiftManager.Instance.client.SendMessage(message, SendMode.Unreliable);
-        }
-    }
-
     public void SendSerializationSync()
     {
+        if (cachedRiftSerializableTypes == null)
+        {
+            cachedRiftSerializableTypes = Assembly.GetExecutingAssembly().DefinedTypes
+                .Where(x => typeof(IRiftSerializable).IsAssignableFrom(x) && !x.IsInterface)
+                .ToArray<TypeInfo>();
+        }
+
         List<RiftMessage> messages = new List<RiftMessage>();
 
-        RiftBehaviour[] behaviours = GameObject.FindObjectsByType<RiftBehaviour>(FindObjectsSortMode.InstanceID);
-        var type = typeof(IRiftSerializable);
-
-        //Seralize event
-        foreach (var rb in behaviours)
+        foreach(var rObject in RiftManager.riftGameObjects)
         {
-            if (type.IsAssignableFrom(rb.GetType()))
+            if (rObject.Key.Owner == client.ID)
             {
-                if (rb._RiftView.Owner == client.ID)
+                //Seralize event
+                foreach (var dt in cachedRiftSerializableTypes)
                 {
-                    IRiftSerializable riftSerializable = (IRiftSerializable)rb;
-
-                    if (riftSerializable != null)
+                    var serializableType = rObject.Value.GetComponent(dt.AsType());
+                    if (serializableType != null)
                     {
-                        RiftMessage newMessage = new RiftMessage(rb._RiftView);
+                        IRiftSerializable riftSerializable = (IRiftSerializable)serializableType;
 
-                        RiftStream stream = new RiftStream(true, null);
-                        riftSerializable.OnStreamSerializeEvent(stream);
-
-
-                        newMessage.message = stream.GetWriteStream().ToArray();
-
-                        if (newMessage.message.Length > 0)
+                        if (riftSerializable != null)
                         {
-                            messages.Add(newMessage);
-                        }
+                            RiftMessage newMessage = new RiftMessage(rObject.Key, dt.AsType().Name);
 
+                            RiftStream stream = new RiftStream(true, null);
+                            riftSerializable.OnStreamSerializeEvent(stream);
+
+                            newMessage.message = stream.GetWriteStream().ToArray();
+
+                            if (newMessage.message.Length > 0)
+                            {
+                                messages.Add(newMessage);
+                            }
+                        }
                     }
-                }
+                }                
             }
         }
 
@@ -121,7 +120,6 @@ public class RiftSerializationController : MonoBehaviour
             {
                 writer.Write(messages[i]);
             }
-
 
             using (Message message = Message.Create(RiftTags.SendStream, writer))
                 RiftManager.Instance.client.SendMessage(message, SendMode.Unreliable);
