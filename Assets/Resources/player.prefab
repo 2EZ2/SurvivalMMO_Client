@@ -14,6 +14,8 @@ GameObject:
   - component: {fileID: 4331332809958478249}
   - component: {fileID: -3887863934103165269}
   - component: {fileID: -6045810904501669920}
+  - component: {fileID: -6599873136740710800}
+  - component: {fileID: 4594925089168181853}
   m_Layer: 0
   m_Name: player
   m_TagString: Untagged
@@ -121,8 +123,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d8f4349313ab17246b8b450501bb7e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveLerpSpeed: 10
-  rotateLerpSpeed: 50
   m_CharacterController: {fileID: -6045810904501669920}
 --- !u!143 &-6045810904501669920
 CharacterController:
@@ -150,3 +150,30 @@ CharacterController:
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &-6599873136740710800
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4757093750822748898}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d7a1c8fc89633e640b12667a32660299, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  moveLerpSpeed: 10
+  rotateLerpSpeed: 50
+--- !u!114 &4594925089168181853
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4757093750822748898}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9d6f43091d74d6747aaed23556c7d297, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  client: {fileID: 0}
