@@ -4,13 +4,17 @@ using UnityEngine;
 
 public class RiftPlayerController : RiftBehaviour
 {
-    [RiftSyncVar]
-    public int Health { get => health; set => health = value; }
 
     public CharacterController m_CharacterController;
+
     private Vector3 m_MoveDir = Vector3.zero;
- 
+
+    [SerializeField]
     private int health = 100;
+
+    [SyncVar]
+    public int Health { get => health; set => health = value; }
+
 
     // Start is called before the first frame update
     void Start()
@@ -38,6 +42,7 @@ public class RiftPlayerController : RiftBehaviour
             float vertical = Input.GetAxis("Vertical");
 
             Vector3 desiredMove = transform.forward * vertical + transform.right * horizontal;
+
             m_MoveDir.x = desiredMove.x * 50f;
             m_MoveDir.z = desiredMove.z * 50f;
 
